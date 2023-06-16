@@ -1,0 +1,92 @@
+dataset_name: anet
+data_root: ${oc.env:SL_DATA_DIR}
+anno_root_downstream: ${oc.env:SL_DATA_DIR}/anno_downstream
+train_file:
+  - ['${anno_root_downstream}/anet_qa_train.json', '${data_root}/anet_videos', video]
+test_types: [val, ]
+test_file:
+  val: ['${anno_root_downstream}/anet_qa_val.json', '${data_root}/anet_videos', video]
+  test: ['${anno_root_downstream}/anet_qa_test.json', '${data_root}/anet_videos', video]
+stop_key: val
+answer_list: ${anno_root_downstream}/anet_qa_answer_list.json
+
+text_encoder: bert-base-uncased
+text_decoder: bert-base-uncased
+bert_config: configs/config_bert.json
+vit_type: beit  # items in ${vit_zoo}
+vit_zoo:  # from huggingface
+  beit: microsoft/beit-base-patch16-224-pt22k-ft22k
+vit_name_or_pretrained_path: ${vit_zoo[${vit_type}]}
+
+vision_encoder_args:
+  token_keep_rate: 0.6
+  token_keep_strategy: cls_attn
+  token_drop_loc: [3, 6, 9]
+  sparse_local_attn: 1
+  sparse_random_attn: 3
+  attn_block_size: 56
+
+joint_encoder_args:
+  token_keep_rate: 0.5
+  token_drop_loc_xmodal: [1]
+
+image_res: 224
+embed_dim: 256
+video_input:
+  num_frames: 8
+  reader: decord  # one of [decord, av]
+  sample_type: rand
+  num_frames_test: 24  # num_frames during inference/test
+  sample_type_test: middle
+
+batch_size:
+  image: 128
+  video: 32
+batch_size_test:
+  image: 64
+  video: 8
+k_test: 128
+temp: 0.07
+eos: '[SEP]'
+max_q_len: 25
+max_a_len: 5
+
+optimizer:
+  opt: adamW
+  lr: 1e-5
+  opt_betas: [0.9, 0.999]  # default
+  weight_decay: 0.02
+  max_grad_norm: -1  # requires a positive float, use -1 to disable
+  different_lr:  # use a different lr for some modules, e.g., larger lr for new modules
+    enable: False
+    module_names: []
+    lr: 1e-3
+
+scheduler:
+  sched: cosine
+  epochs: 10
+  min_lr_multi: 0.1  # min_lr will be `optimizer.lr * min_lr_multi`
+  warmup_epochs: 0.5  # float
+
+output_dir: None # output dir
+pretrained_path: None  # path to pretrained model weights
+resume: False  # if True, load optimizer and scheduler states as well
+evaluate: False
+# `eval_frame_ensemble': how do we aggregate scores if `video_input.num_frames_test' > `video_input.num_frames'
+# `concat': concat frames before input to multi-modal encoder, i.e., early fusion
+# `mean', `max', `lse': mean/max/lse-pool scores after multi-modal encoder, i.e., late fusion, as in ClipBERT
+eval_frame_ensemble: lse  # [concat, max, mean, lse]
+device: cuda
+seed: 42
+log_freq: 100
+dist_url: env://
+distributed: True
+fp16: True
+debug: False
+num_workers: 8
+
+wandb:
+  enable: False
+  entity: None   # username or teamname to store the runs, see https://docs.wandb.ai/ref/python/init
+  project: activitynet_qa  # setup in your command line
+
